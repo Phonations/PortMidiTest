@@ -20,9 +20,9 @@ int ff1 = 0;
 int ff2 = 0;
 int rate = 0;
 
-QString conv(int n, int length, int base)
+const char * conv(int n, int length, int base)
 {
-	return QString("%1").arg(n, length, base, QChar('0')).toUpper();
+	return QString("%1").arg(n, length, base, QChar('0')).toUpper().toStdString().c_str();
 }
 
 PmTimestamp proc(void *time_info)
