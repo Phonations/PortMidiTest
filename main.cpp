@@ -9,6 +9,9 @@
 
 #include <portmidi.h>
 
+#define Pm_MessageData3(msg) (((msg) >> 24) & 0xFF)
+
+
 PortMidiStream *stream;
 int hh1 = 0;
 int hh2 = 0;
@@ -28,13 +31,65 @@ const char * conv(int n, int length, int base)
 PmTimestamp proc(void *time_info)
 {
 	PmEvent event;
-	Pm_Read(stream, &event, 1);
+
+	int err = Pm_Read(stream, &event, 1);
+	if(err < 0)
+	{
+		qDebug() << "Error while reading the first message" << Pm_GetErrorText((PmError) err);
+		return 0;
+	}
 	int status = Pm_MessageStatus(event.message);
 
 	switch (status) {
 	case 0xF0:
-		qDebug() << "SysEx" << conv(event.message, 8, 16) << event.message;
+	{
+		int manufactorID = Pm_MessageData1(event.message);
+		int channel = Pm_MessageData2(event.message);
+		int type = Pm_MessageData3(event.message);
+
+		switch (type) {
+		case 0x01:
+		{
+			err = Pm_Read(stream, &event, 1);
+			if(err < 0)
+			{
+				qDebug() << "Error while reading the TC message" << Pm_GetErrorText((PmError)err);
+				return 0;
+			}
+			int tcType = Pm_MessageStatus(event.message);
+			if(tcType == 1)
+			{
+				int data1 = Pm_MessageData1(event.message);
+				int hh = data1 & 0x1F; // remove the FPS information
+				int mm = Pm_MessageData2(event.message);
+				int ss = Pm_MessageData3(event.message);
+
+				err = Pm_Read(stream, &event, 1);
+				if(err < 0)
+				{
+					qDebug() << "Error while reading the end of the TC message" << Pm_GetErrorText((PmError)err);
+					return 0;
+				}
+				int ff = Pm_MessageStatus(event.message);
+				int eox = Pm_MessageData1(event.message);
+				if(eox == 0xF7)
+					qDebug() << "Full tc" << hh << mm << ss << ff;
+				else
+					qDebug() << "Bad TC message";
+			}
+			else
+			{
+				qDebug() << "Unknown tc type";
+			}
+		}
+			break;
+		default:
+			qDebug() << "Unknown SesEx type";
+			break;
+		}
 		break;
+	}
+		// QF
 	case 0xF1:
 	{
 		int data1 = Pm_MessageData1(event.message);
@@ -76,26 +131,15 @@ PmTimestamp proc(void *time_info)
 		//qDebug() << "MTC QF" << hh << mm << ss << ff;
 		break;
 	}
-	case 0xF7:
-		qDebug() << "EO SysEx" << conv(event.message, 8, 16);
-		break;
+	// Timming clock
 	case 0xF8:
 		//qDebug() << "timming clock";
 		break;
 
 	default:
 		qDebug() << conv(event.message, 8, 16) << conv(status, 2, 16);
-
 		break;
 	}
-
-	//qDebug() << ss << ff << event.timestamp << QString::number(status, 16)<< QString::number(data1, 2) << type << value << ff1 << ff2 << ff;
-	//qDebug() << event.message << conv(event.timestamp, 8, 10) << conv(data1, 8, 2) << conv(type, 3, 2) << rate << hh << mm << ss << ff << status;
-
-//	qDebug() << conv(status, 2, 16) << conv(data1, 2, 16) << conv(data2, 2, 16);
-//	qDebug() << status << data1 << data2;
-//	qDebug() << "-------------------------";
-
 
 	return 0;
 }
@@ -118,7 +162,7 @@ int main(int argc, char *argv[])
 		qDebug() << i << info->name << info->input << info->output;
 	}
 
-	PmDeviceID id = 1;
+	PmDeviceID id = 3;
 
 	error = Pm_OpenInput(&stream, id, NULL, 0, proc, NULL);
 
