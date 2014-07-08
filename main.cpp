@@ -13,15 +13,13 @@
 
 
 PortMidiStream *stream;
-int hh1 = 0;
-int hh2 = 0;
-int mm1 = 0;
-int mm2 = 0;
-int ss1 = 0;
-int ss2 = 0;
-int ff1 = 0;
-int ff2 = 0;
+
 int rate = 0;
+
+int ff = 0;
+int ss = 0;
+int mm = 0;
+int hh = 0;
 
 const char * conv(int n, int length, int base)
 {
@@ -60,9 +58,9 @@ PmTimestamp proc(void *time_info)
 			if(tcType == 1)
 			{
 				int data1 = Pm_MessageData1(event.message);
-				int hh = data1 & 0x1F; // remove the FPS information
-				int mm = Pm_MessageData2(event.message);
-				int ss = Pm_MessageData3(event.message);
+				hh = data1 & 0x1F; // remove the FPS information
+				mm = Pm_MessageData2(event.message);
+				ss = Pm_MessageData3(event.message);
 
 				err = Pm_Read(stream, &event, 1);
 				if(err < 0)
@@ -70,7 +68,7 @@ PmTimestamp proc(void *time_info)
 					qDebug() << "Error while reading the end of the TC message" << Pm_GetErrorText((PmError)err);
 					return 0;
 				}
-				int ff = Pm_MessageStatus(event.message);
+				ff = Pm_MessageStatus(event.message);
 				int eox = Pm_MessageData1(event.message);
 				if(eox == 0xF7)
 					qDebug() << "Full tc" << hh << mm << ss << ff;
@@ -93,47 +91,44 @@ PmTimestamp proc(void *time_info)
 	case 0xF1:
 	{
 		int data1 = Pm_MessageData1(event.message);
-		int data2 = Pm_MessageData2(event.message);
 		int type = data1 >> 4;
 		int value = data1 & 0xf;
 
 		switch(type) {
 		case 0:
-			ff1 = value;
+			ff = (ff & 0xF0) + value;
+			qDebug() << "MTC QF" << conv(event.message, 8, 16) << type << hh << mm << ss << ff;
+
 			break;
 		case 1:
-			ff2 = value;
+			ff = (value << 4) + (ff & 0x0F) ;
 			break;
 		case 2:
-			ss1 = value;
+			ss = (ss & 0xF0) + value;
 			break;
 		case 3:
-			ss2 = value;
+			ss = (value << 4) + (ss & 0x0F);
+			break;
 		case 4:
-			mm1 = value;
+			mm = (mm & 0xF0) + value;
 			break;
 		case 5:
-			mm2 = value;
+			mm = (value << 4) + (mm & 0x0F);
 			break;
 		case 6:
-			hh1 = value;
+			hh = (hh & 0xF0) + value;
 			break;
 		case 7:
-			hh2 = value & 1;
+			hh = ((value & 1) << 4) + (hh & 0x0F);
 			rate = value >> 1;
 			break;
 		}
 
-		int ff = (ff2 << 4) + ff1;
-		int ss = (ss2 << 4) + ss1;
-		int mm = (mm2 << 4) + mm1;
-		int hh = (hh2 << 4) + hh1;
-		//qDebug() << "MTC QF" << hh << mm << ss << ff;
 		break;
 	}
-	// Timming clock
+		// Timming clock
 	case 0xF8:
-		//qDebug() << "timming clock";
+		qDebug() << "timming clock";
 		break;
 
 	default:
@@ -162,7 +157,7 @@ int main(int argc, char *argv[])
 		qDebug() << i << info->name << info->input << info->output;
 	}
 
-	PmDeviceID id = 3;
+	PmDeviceID id = 2; //3;
 
 	error = Pm_OpenInput(&stream, id, NULL, 0, proc, NULL);
 
