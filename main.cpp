@@ -36,7 +36,6 @@ PmTimestamp proc(void *time_info)
 		int messageRead = Pm_Read(stream, &event, 1);
 		if(messageRead <= 0)
 			reading = false;
-
 		int status = Pm_MessageStatus(event.message);
 
 		switch (status) {
@@ -86,8 +85,29 @@ PmTimestamp proc(void *time_info)
 				}
 				break;
 			}
+			case 0x07:
+			{
+				messageRead = Pm_Read(stream, &event, 1);
+				if(messageRead < 0)
+				{
+					qDebug() << "Error while reading the answer message" << Pm_GetErrorText((PmError)messageRead);
+					return 0;
+				}
+				int status = Pm_MessageStatus(event.message);
+				int data1 = Pm_MessageData1(event.message);
+				int data2 = Pm_MessageData2(event.message);
+				int data3 = Pm_MessageData3(event.message);
+				if(data3 == 0xF7)
+				{
+					qDebug() << conv(event.message, 8, 16) << "Unknown MMC answer" << conv(status, 2, 16);
+				}
+				else
+					qDebug() << conv(event.message, 8, 16) << "wrong MMC answer";
+				break;
+
+			}
 			default:
-				qDebug() << "Unknown SysEx type" << conv(type, 2, 16);
+				qDebug() << conv(event.message, 8, 16) << "Unknown SysEx type" << conv(type, 2, 16);
 				break;
 			}
 			break;
@@ -127,7 +147,7 @@ PmTimestamp proc(void *time_info)
 				break;
 			}
 
-			qDebug() << "MTC QF" << conv(event.message, 8, 16) << type << hh << mm << ss << ff;
+			qDebug() << "MTC QF" << conv(event.message, 8, 16) << type << hh << mm << ss << ff << conv(data1, 2, 16);
 			break;
 		}
 			// Timming clock
