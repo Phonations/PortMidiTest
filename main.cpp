@@ -32,13 +32,10 @@ PmTimestamp proc(void *time_info)
 
 	while(true)
 	{
-		int err = Pm_Read(stream, &event, 1);
-		qDebug() << err;
-		if(err <= 0)
-		{
-			qDebug() << "-----------------------";
+		int messageRead = Pm_Read(stream, &event, 1);
+		if(messageRead <= 0)
 			break;
-		}
+
 		int status = Pm_MessageStatus(event.message);
 
 		switch (status) {
@@ -51,10 +48,10 @@ PmTimestamp proc(void *time_info)
 			switch (type) {
 			case 0x01:
 			{
-				err = Pm_Read(stream, &event, 1);
-				if(err < 0)
+				messageRead = Pm_Read(stream, &event, 1);
+				if(messageRead < 0)
 				{
-					qDebug() << "Error while reading the TC message" << Pm_GetErrorText((PmError)err);
+					qDebug() << "Error while reading the TC message" << Pm_GetErrorText((PmError)messageRead);
 					return 0;
 				}
 				int tcType = Pm_MessageStatus(event.message);
@@ -65,10 +62,10 @@ PmTimestamp proc(void *time_info)
 					mm = Pm_MessageData2(event.message);
 					ss = Pm_MessageData3(event.message);
 
-					err = Pm_Read(stream, &event, 1);
-					if(err < 0)
+					messageRead = Pm_Read(stream, &event, 1);
+					if(messageRead < 0)
 					{
-						qDebug() << "Error while reading the end of the TC message" << Pm_GetErrorText((PmError)err);
+						qDebug() << "Error while reading the end of the TC message" << Pm_GetErrorText((PmError)messageRead);
 						return 0;
 					}
 					ff = Pm_MessageStatus(event.message);
@@ -85,7 +82,7 @@ PmTimestamp proc(void *time_info)
 				break;
 			}
 			default:
-				qDebug() << "Unknown SysEx type";
+				qDebug() << "Unknown SysEx type" << conv(type, 2, 16);
 				break;
 			}
 			break;
