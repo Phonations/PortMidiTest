@@ -30,11 +30,12 @@ PmTimestamp proc(void *time_info)
 {
 	PmEvent event;
 
-	while(true)
+	bool reading = true;
+	while(reading)
 	{
 		int messageRead = Pm_Read(stream, &event, 1);
 		if(messageRead <= 0)
-			break;
+			reading = false;
 
 		int status = Pm_MessageStatus(event.message);
 
