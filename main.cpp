@@ -72,7 +72,11 @@ PmTimestamp proc(void *time_info)
 					ff = Pm_MessageStatus(event.message);
 					int eox = Pm_MessageData1(event.message);
 					if(eox == 0xF7)
+					{
 						qDebug() << "Full tc" << hh << mm << ss << ff;
+						// we SUPPOSE that the next message is garbage
+						reading = false;
+					}
 					else
 						qDebug() << "Bad TC message";
 				}
