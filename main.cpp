@@ -30,110 +30,113 @@ PmTimestamp proc(void *time_info)
 {
 	PmEvent event;
 
-	int err = Pm_Read(stream, &event, 1);
-	if(err < 0)
+	while(true)
 	{
-		qDebug() << "Error while reading the first message" << Pm_GetErrorText((PmError) err);
-		return 0;
-	}
-	int status = Pm_MessageStatus(event.message);
-
-	switch (status) {
-	case 0xF0:
-	{
-		int manufactorID = Pm_MessageData1(event.message);
-		int channel = Pm_MessageData2(event.message);
-		int type = Pm_MessageData3(event.message);
-
-		switch (type) {
-		case 0x01:
+		int err = Pm_Read(stream, &event, 1);
+		qDebug() << err;
+		if(err <= 0)
 		{
-			err = Pm_Read(stream, &event, 1);
-			if(err < 0)
-			{
-				qDebug() << "Error while reading the TC message" << Pm_GetErrorText((PmError)err);
-				return 0;
-			}
-			int tcType = Pm_MessageStatus(event.message);
-			if(tcType == 1)
-			{
-				int data1 = Pm_MessageData1(event.message);
-				hh = data1 & 0x1F; // remove the FPS information
-				mm = Pm_MessageData2(event.message);
-				ss = Pm_MessageData3(event.message);
+			qDebug() << "-----------------------";
+			break;
+		}
+		int status = Pm_MessageStatus(event.message);
 
+		switch (status) {
+		case 0xF0:
+		{
+			int manufactorID = Pm_MessageData1(event.message);
+			int channel = Pm_MessageData2(event.message);
+			int type = Pm_MessageData3(event.message);
+
+			switch (type) {
+			case 0x01:
+			{
 				err = Pm_Read(stream, &event, 1);
 				if(err < 0)
 				{
-					qDebug() << "Error while reading the end of the TC message" << Pm_GetErrorText((PmError)err);
+					qDebug() << "Error while reading the TC message" << Pm_GetErrorText((PmError)err);
 					return 0;
 				}
-				ff = Pm_MessageStatus(event.message);
-				int eox = Pm_MessageData1(event.message);
-				if(eox == 0xF7)
-					qDebug() << "Full tc" << hh << mm << ss << ff;
+				int tcType = Pm_MessageStatus(event.message);
+				if(tcType == 1)
+				{
+					int data1 = Pm_MessageData1(event.message);
+					hh = data1 & 0x1F; // remove the FPS information
+					mm = Pm_MessageData2(event.message);
+					ss = Pm_MessageData3(event.message);
+
+					err = Pm_Read(stream, &event, 1);
+					if(err < 0)
+					{
+						qDebug() << "Error while reading the end of the TC message" << Pm_GetErrorText((PmError)err);
+						return 0;
+					}
+					ff = Pm_MessageStatus(event.message);
+					int eox = Pm_MessageData1(event.message);
+					if(eox == 0xF7)
+						qDebug() << "Full tc" << hh << mm << ss << ff;
+					else
+						qDebug() << "Bad TC message";
+				}
 				else
-					qDebug() << "Bad TC message";
+				{
+					qDebug() << "Unknown tc type";
+				}
+				break;
 			}
-			else
-			{
-				qDebug() << "Unknown tc type";
+			default:
+				qDebug() << "Unknown SysEx type";
+				break;
 			}
-		}
-			break;
-		default:
-			qDebug() << "Unknown SesEx type";
 			break;
 		}
-		break;
-	}
-		// QF
-	case 0xF1:
-	{
-		int data1 = Pm_MessageData1(event.message);
-		int type = data1 >> 4;
-		int value = data1 & 0xf;
+			// QF
+		case 0xF1:
+		{
+			int data1 = Pm_MessageData1(event.message);
+			int type = data1 >> 4;
+			int value = data1 & 0xf;
 
-		switch(type) {
-		case 0:
-			ff = (ff & 0xF0) + value;
+			switch(type) {
+			case 0:
+				ff = (ff & 0xF0) + value;
+				break;
+			case 1:
+				ff = (value << 4) + (ff & 0x0F) ;
+				break;
+			case 2:
+				ss = (ss & 0xF0) + value;
+				break;
+			case 3:
+				ss = (value << 4) + (ss & 0x0F);
+				break;
+			case 4:
+				mm = (mm & 0xF0) + value;
+				break;
+			case 5:
+				mm = (value << 4) + (mm & 0x0F);
+				break;
+			case 6:
+				hh = (hh & 0xF0) + value;
+				break;
+			case 7:
+				hh = ((value & 1) << 4) + (hh & 0x0F);
+				rate = value >> 1;
+				break;
+			}
+
 			qDebug() << "MTC QF" << conv(event.message, 8, 16) << type << hh << mm << ss << ff;
-
-			break;
-		case 1:
-			ff = (value << 4) + (ff & 0x0F) ;
-			break;
-		case 2:
-			ss = (ss & 0xF0) + value;
-			break;
-		case 3:
-			ss = (value << 4) + (ss & 0x0F);
-			break;
-		case 4:
-			mm = (mm & 0xF0) + value;
-			break;
-		case 5:
-			mm = (value << 4) + (mm & 0x0F);
-			break;
-		case 6:
-			hh = (hh & 0xF0) + value;
-			break;
-		case 7:
-			hh = ((value & 1) << 4) + (hh & 0x0F);
-			rate = value >> 1;
 			break;
 		}
+			// Timming clock
+		case 0xF8:
+			qDebug() << "timming clock";
+			break;
 
-		break;
-	}
-		// Timming clock
-	case 0xF8:
-		qDebug() << "timming clock";
-		break;
-
-	default:
-		qDebug() << conv(event.message, 8, 16) << conv(status, 2, 16);
-		break;
+		default:
+			qDebug() << conv(event.message, 8, 16) << conv(status, 2, 16);
+			break;
+		}
 	}
 
 	return 0;
