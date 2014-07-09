@@ -33,52 +33,50 @@ const char * displayTC(int hh, int mm, int ss, int ff)
 
 PmTimestamp proc(void *time_info)
 {
-	PmEvent event;
+	PmEvent events[10];
 
-	bool reading = true;
-	while(reading)
+	int messageCount = Pm_Read(stream, events, 10);
+	//qDebug() << messageCount;
+
+	for(int i = 0; i < messageCount; i++)
 	{
-		int messageRead = Pm_Read(stream, &event, 1);
-		if(messageRead <= 0)
-			reading = false;
-		int status = Pm_MessageStatus(event.message);
+		int status = Pm_MessageStatus(events[i].message);
+		//qDebug() << i << "/" << messageCount;
 
 		switch (status) {
 		case 0xF0:
 		{
-			int manufactorID = Pm_MessageData1(event.message);
-			int channel = Pm_MessageData2(event.message);
-			int type = Pm_MessageData3(event.message);
+			int manufactorID = Pm_MessageData1(events[i].message);
+			int channel = Pm_MessageData2(events[i].message);
+			int type = Pm_MessageData3(events[i].message);
 
 			switch (type) {
 			case 0x01:
 			{
-				messageRead = Pm_Read(stream, &event, 1);
-				if(messageRead < 0)
+				i++;
+				if(i >= messageCount)
 				{
-					qDebug() << "Error while reading the TC message" << Pm_GetErrorText((PmError)messageRead);
+					qDebug() << "Error while reading the TC message";
 					return 0;
 				}
-				int tcType = Pm_MessageStatus(event.message);
+				int tcType = Pm_MessageStatus(events[i].message);
 				if(tcType == 1)
 				{
-					int data1 = Pm_MessageData1(event.message);
+					int data1 = Pm_MessageData1(events[i].message);
 					hh = data1 & 0x1F; // remove the FPS information
-					mm = Pm_MessageData2(event.message);
-					ss = Pm_MessageData3(event.message);
+					mm = Pm_MessageData2(events[i].message);
+					ss = Pm_MessageData3(events[i].message);
 
-					messageRead = Pm_Read(stream, &event, 1);
-					if(messageRead < 0)
+					i++;
+					if(i >= messageCount)
 					{
-						qDebug() << "Error while reading the end of the TC message" << Pm_GetErrorText((PmError)messageRead);
+						qDebug() << "Error while reading the end of the TC message";
 						return 0;
 					}
-					ff = Pm_MessageStatus(event.message);
-					int eox = Pm_MessageData1(event.message);
+					ff = Pm_MessageStatus(events[i].message);
+					int eox = Pm_MessageData1(events[i].message);
 					if(eox == 0xF7)
 					{
-						// we SUPPOSE that the next message is garbage
-						reading = false;
 						qDebug() << "Full tc" << displayTC(hh, mm, ss, ff);
 					}
 					else
@@ -92,27 +90,27 @@ PmTimestamp proc(void *time_info)
 			}
 			case 0x07:
 			{
-				messageRead = Pm_Read(stream, &event, 1);
-				if(messageRead < 0)
+				i++;
+				if(i >= messageCount)
 				{
-					qDebug() << "Error while reading the answer message" << Pm_GetErrorText((PmError)messageRead);
+					qDebug() << "Error while reading the answer message";
 					return 0;
 				}
-				int status = Pm_MessageStatus(event.message);
-				int data1 = Pm_MessageData1(event.message);
-				int data2 = Pm_MessageData2(event.message);
-				int data3 = Pm_MessageData3(event.message);
+				int status = Pm_MessageStatus(events[i].message);
+				int data1 = Pm_MessageData1(events[i].message);
+				int data2 = Pm_MessageData2(events[i].message);
+				int data3 = Pm_MessageData3(events[i].message);
 				if(data3 == 0xF7)
 				{
-					qDebug() << conv(event.message, 8, 16) << "Unknown MMC answer" << conv(status, 2, 16);
+					qDebug() << conv(events[i].message, 8, 16) << "Unknown MMC answer" << conv(status, 2, 16);
 				}
 				else
-					qDebug() << conv(event.message, 8, 16) << "wrong MMC answer";
+					qDebug() << conv(events[i].message, 8, 16) << "wrong MMC answer";
 				break;
 
 			}
 			default:
-				qDebug() << conv(event.message, 8, 16) << "Unknown SysEx type" << conv(type, 2, 16);
+				qDebug() << conv(events[i].message, 8, 16) << "Unknown SysEx type" << conv(type, 2, 16);
 				break;
 			}
 			break;
@@ -120,7 +118,7 @@ PmTimestamp proc(void *time_info)
 			// QF
 		case 0xF1:
 		{
-			int data1 = Pm_MessageData1(event.message);
+			int data1 = Pm_MessageData1(events[i].message);
 			int type = data1 >> 4;
 			int value = data1 & 0xf;
 
@@ -161,7 +159,7 @@ PmTimestamp proc(void *time_info)
 			break;
 
 		default:
-			qDebug() << conv(event.message, 8, 16) << conv(status, 2, 16);
+			qDebug() << conv(events[i].message, 8, 16) << conv(status, 2, 16);
 			break;
 		}
 	}
