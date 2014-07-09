@@ -26,6 +26,11 @@ const char * conv(int n, int length, int base)
 	return QString("%1").arg(n, length, base, QChar('0')).toUpper().toStdString().c_str();
 }
 
+const char * displayTC(int hh, int mm, int ss, int ff)
+{
+	return QString("%1:%2:%3:%4").arg(hh).arg(mm).arg(ss).arg(ff).toStdString().c_str();
+}
+
 PmTimestamp proc(void *time_info)
 {
 	PmEvent event;
@@ -72,9 +77,9 @@ PmTimestamp proc(void *time_info)
 					int eox = Pm_MessageData1(event.message);
 					if(eox == 0xF7)
 					{
-						qDebug() << "Full tc" << hh << mm << ss << ff;
 						// we SUPPOSE that the next message is garbage
 						reading = false;
+						qDebug() << "Full tc" << displayTC(hh, mm, ss, ff);
 					}
 					else
 						qDebug() << "Bad TC message";
@@ -147,7 +152,7 @@ PmTimestamp proc(void *time_info)
 				break;
 			}
 
-			qDebug() << "MTC QF" << conv(event.message, 8, 16) << type << hh << mm << ss << ff << conv(data1, 2, 16);
+			qDebug() << "MTC QF" << conv(events[i].message, 8, 16) << type << displayTC(hh, mm, ss, ff) << conv(data1, 2, 16);
 			break;
 		}
 			// Timming clock
